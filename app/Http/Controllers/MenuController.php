@@ -94,7 +94,68 @@ class MenuController extends BaseController
     ]
      */
 
-    public function getMenuItems() {
-        throw new \Exception('implement in coding task 3');
+    public function getMenuItems()
+    {
+        $menuItems = MenuItem::orderBy('parent_id', 'asc')->get();
+
+        //https://gist.github.com/ArneGockeln/d2b210456770d306407ff3b6fe9a8cbc
+        // This function searches for needle inside of multidimensional array haystack
+        // Returns the path to the found element or false
+        function in_array_multi($needle, $haystack)
+        {
+            if (!is_array($haystack)) return false;
+
+            foreach ($haystack as $key => $value) {
+                if ($value == $needle) {
+                    return $key;
+                } else if (is_array($value)) {
+                    // multi search
+                    $key_result = in_array_multi($needle, $value);
+                    if ($key_result !== false) {
+
+                        return $key . '_' . $key_result;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        $menuTree = [];
+
+        foreach ($menuItems as $menu) {
+
+            if (!$menu['parent_id']) {
+                $menuTree[] = $menu->toArray();
+            } else {
+                $key_path = in_array_multi($menu['parent_id'], $menuTree);
+
+                if ($key_path !== false) {
+                    $path = explode('_', $key_path);
+                    $result = [];
+
+                    foreach ($path as $key => $xpath) {
+                        if ($key == 0) {
+                            $result = &$menuTree[$xpath];
+                        } else {
+                            if (is_array($result[$xpath])) {
+                                $result = &$result[$xpath]; // Return reference so that it can be later
+                            }
+                        }
+                    }
+
+                    if (isset($result['children'])) {
+                        $result['children'][] = $menu->toArray();
+                    } else {
+                        $result['children'] = [];
+                        $result['children'][] = $menu->toArray();
+                    }
+
+                    unset($result); // Reset the result so that it can't create the last reference issue
+                }
+            }
+        }
+
+        return response()->json($menuTree);
     }
 }
